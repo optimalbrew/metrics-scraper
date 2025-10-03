@@ -1,5 +1,6 @@
 // rsk_ws.js
 // Will connect and capture the WS data for 10 seconds
+// this was just for initial exploration
 
 const WebSocket = require('ws');
 const axiosBase = require('axios');
