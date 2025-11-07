@@ -309,9 +309,33 @@ async function detectBlocking(page, response) {
         // Look for fee on transaction page - try multiple comprehensive approaches
         console.log('🔍 Searching for transfer fee...');
         
-        // Method 0: Use specific class names from inspection
-        try {
-          console.log('🔍 Method 0: Using specific class selectors...');
+        // Method 0: Look in table rows FIRST (most reliable method)
+        if (!transferFee) {
+          try {
+            console.log('🔍 Method 0: Searching in tables (most reliable)...');
+            const tableRows = await page.locator('tr, [role="row"]').all();
+            for (const row of tableRows.slice(0, 50)) {
+              const rowText = await row.textContent().catch(() => '');
+              if (rowText && (rowText.includes('Fee') || rowText.includes('fee'))) {
+                console.log(`Found fee row: "${rowText.substring(0, 200)}"`);
+                const feeResult = extractSTXFee(rowText);
+                if (feeResult && feeResult.fee > 0 && feeResult.fee < 2) {
+                  transferFee = feeResult.fee;
+                  transferFeeRaw = feeResult.cleanText;
+                  console.log(`✅ Found fee in table row: ${transferFee} STX`);
+                  break;
+                }
+              }
+            }
+          } catch (e) {
+            console.log(`Method 0 (table search) failed: ${e.message}`);
+          }
+        }
+        
+        // Method 1: Use specific class names from inspection
+        if (!transferFee) {
+          try {
+            console.log('🔍 Method 1: Using specific class selectors...');
           
           // Try to find the Fee div using the specific class
           // The fee value "0.01 STX" is in the same div as the Fee label
@@ -474,11 +498,12 @@ async function detectBlocking(page, response) {
               continue;
             }
           }
-        } catch (e) {
-          console.log(`Method 0 failed: ${e.message}`);
+          } catch (e) {
+            console.log(`Method 1 failed: ${e.message}`);
+          }
         }
         
-        // Method 1: Look for "Fee" label and get nearby text
+        // Method 2: Look for "Fee" label and get nearby text
         if (!transferFee) {
           try {
             const feeSelectors = [
@@ -536,29 +561,6 @@ async function detectBlocking(page, response) {
                 }
               } catch (e) {
                 continue;
-              }
-            }
-          } catch (e) {
-            console.log(`Method 1 failed: ${e.message}`);
-          }
-        }
-        
-        // Method 2: Look in table rows (fees are often in tables)
-        if (!transferFee) {
-          try {
-            console.log('🔍 Searching in tables...');
-            const tableRows = await page.locator('tr, [role="row"]').all();
-            for (const row of tableRows.slice(0, 50)) {
-              const rowText = await row.textContent().catch(() => '');
-              if (rowText && (rowText.includes('Fee') || rowText.includes('fee'))) {
-                console.log(`Found fee row: "${rowText.substring(0, 200)}"`);
-                const feeResult = extractSTXFee(rowText);
-                if (feeResult && feeResult.fee > 0 && feeResult.fee < 2) {
-                  transferFee = feeResult.fee;
-                  transferFeeRaw = feeResult.cleanText;
-                  console.log(`✅ Found fee in table row: ${transferFee} STX`);
-                  break;
-                }
               }
             }
           } catch (e) {
